@@ -7,11 +7,11 @@ public interface IRNPManagerService extends IFloodlightService {
      * Adds a REST API
      * @param IRNP message in bytes
      */
-	public void processingMessage(byte[] messageBytes);
+	public String processMessage(byte[] messageBytes);
 	
-	/**
-     * Adds a REST API
-     * @param path
-     */
-	public void reserveForPath();
+//	/**
+//     * Adds a REST API
+//     * @param path
+//     */
+//	public void reserveForPath();
 }

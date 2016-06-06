@@ -7,6 +7,13 @@ import irnp.objects.*;
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
+import java.util.Base64;
+
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
 
 public class IRNPProcessor {
 	
@@ -38,48 +45,34 @@ public class IRNPProcessor {
 	}
 	
 	//Message processing
-	public void service() throws IOException, IRNPProtocolViolationException {
-		Socket connectionSocketWithDataPort = welcomeSocketWithDataPort.accept();
-		DataInputStream dis = new DataInputStream(connectionSocketWithDataPort
-				.getInputStream());
-		
-		byte[] buf = new byte[4*1024];
-		while(true) {
-			int length = dis.read(buf);
-			if(length < 8) {
-				System.out.println("Invalid Message Recieved");
-			} else {
-				byte[] messageBytes = new byte[length];
-				System.arraycopy(buf, 0, messageBytes, 0, length);
-				IRNPRequestMessage message = new IRNPRequestMessage();
-				message.setBytes(messageBytes);
-				message.encodeHeader();
-				switch(message.getMsgType()) {
-				case IRNPMessageTypes.MESSAGE_REQUEST: {
-					handleRequestMessage(messageBytes);
-				}
-				case IRNPMessageTypes.MESSAGE_REPLY: {
-					handleReplyMessage(messageBytes);
-				}
-				case  IRNPMessageTypes.MESSAGE_REQUEST_ERROR: {
-					handleRequestErrorMessage(messageBytes);
-				}
-				case  IRNPMessageTypes.MESSAGE_REPLY_ERROR: {
-					handleReplyErrorMessage(messageBytes);
-				}
-				case IRNPMessageTypes.MESSAGE_REQUEST_WITHDRAW: {
-					handleRequestWithdrawMessage(messageBytes);
-				}
-				case IRNPMessageTypes.MESSAGE_REPLY_WITHDRAW: {
-					handleReplyWithdrawMessage(messageBytes);
-				}
-				case IRNPMessageTypes.MESSAGE_REQUEST_WITHDRAW_ERROR: {
-					handleRequestWithdrawErrorMessage(messageBytes);
-				}
-				case IRNPMessageTypes.MESSAGE_REPLY_WITHDRAW_ERROR: {
-					handleReplyWithdrawErrorMessage(messageBytes);
-				}
-				}
+	public void processMessage(byte[] messageBytes) throws IOException, IRNPProtocolViolationException {
+		IRNPRequestMessage message = new IRNPRequestMessage();
+		message.setBytes(messageBytes);
+		message.decodeHeader();
+		switch(message.getMsgType()) {
+			case IRNPMessageTypes.MESSAGE_REQUEST: {
+				handleRequestMessage(messageBytes);
+			}
+			case IRNPMessageTypes.MESSAGE_REPLY: {
+				handleReplyMessage(messageBytes);
+			}
+			case  IRNPMessageTypes.MESSAGE_REQUEST_ERROR: {
+				handleRequestErrorMessage(messageBytes);
+			}
+			case  IRNPMessageTypes.MESSAGE_REPLY_ERROR: {
+				handleReplyErrorMessage(messageBytes);
+			}
+			case IRNPMessageTypes.MESSAGE_REQUEST_WITHDRAW: {
+				handleRequestWithdrawMessage(messageBytes);
+			}
+			case IRNPMessageTypes.MESSAGE_REPLY_WITHDRAW: {
+				handleReplyWithdrawMessage(messageBytes);
+			}
+			case IRNPMessageTypes.MESSAGE_REQUEST_WITHDRAW_ERROR: {
+				handleRequestWithdrawErrorMessage(messageBytes);
+			}
+			case IRNPMessageTypes.MESSAGE_REPLY_WITHDRAW_ERROR: {
+				handleReplyWithdrawErrorMessage(messageBytes);
 			}
 		}
 	}
@@ -985,6 +978,50 @@ public void requestWithdrawPath(int flowNum, int targetAsNum, int flowBandwidth)
 		}
 		return false;
 	}
+	
+	public void sendMessage(String ipAddr, byte[] messageBytes) {
+		String httpUrl = "http://" + ipAddr + ":8080/irnp/message/";
+		try {
+			String message = Base64.getUrlEncoder().encodeToString(messageBytes);
+			httpUrl = httpUrl + message;
+			CloseableHttpClient httpclient = HttpClients.createDefault();
+	        // 创建Get方法实例     
+	        HttpGet httpgets = new HttpGet(httpUrl);    
+	        HttpResponse response = httpclient.execute(httpgets);    
+	        HttpEntity entity = response.getEntity();    
+	        if (entity != null) {    
+	            InputStream instreams = entity.getContent();    
+	            String str = convertStreamToString(instreams);  
+	            System.out.print("Sending IRNP message:");   
+	            System.out.println(str);  
+	            // Do not need the rest    
+	            httpgets.abort();    
+	        }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+	}
+	
+	public static String convertStreamToString(InputStream is) {      
+        BufferedReader reader = new BufferedReader(new InputStreamReader(is));      
+        StringBuilder sb = new StringBuilder();      
+       
+        String line = null;      
+        try {      
+            while ((line = reader.readLine()) != null) {  
+                sb.append(line + "\n");      
+            }      
+        } catch (IOException e) {      
+            e.printStackTrace();      
+        } finally {      
+            try {      
+                is.close();      
+            } catch (IOException e) {      
+               e.printStackTrace();      
+            }      
+        }      
+        return sb.toString();      
+    }
 	
 	//Getter and Setters
 	public long getCurrentTotalUpstreamBandwidth() {
